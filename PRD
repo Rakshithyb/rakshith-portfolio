@@ -1,0 +1,510 @@
+from docx import Document
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_SECTION
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from pathlib import Path
+
+out = Path("/mnt/data")
+out.mkdir(exist_ok=True)
+
+def setup_doc(doc, title, subtitle):
+    sec = doc.sections[0]
+    sec.top_margin = Inches(0.7)
+    sec.bottom_margin = Inches(0.7)
+    sec.left_margin = Inches(0.8)
+    sec.right_margin = Inches(0.8)
+    styles = doc.styles
+    styles["Normal"].font.name = "Aptos"
+    styles["Normal"].font.size = Pt(10)
+    styles["Normal"].font.color.rgb = RGBColor(35, 35, 35)
+    for style_name, size in [("Title", 28), ("Heading 1", 18), ("Heading 2", 13), ("Heading 3", 11)]:
+        styles[style_name].font.name = "Aptos Display"
+        styles[style_name].font.size = Pt(size)
+        styles[style_name].font.bold = True
+        styles[style_name].font.color.rgb = RGBColor(15, 15, 15)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(title)
+    r.bold = True
+    r.font.name = "Aptos Display"
+    r.font.size = Pt(28)
+    r.font.color.rgb = RGBColor(10, 10, 10)
+    p2 = doc.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r2 = p2.add_run(subtitle)
+    r2.font.size = Pt(11)
+    r2.font.color.rgb = RGBColor(100, 100, 100)
+    doc.add_paragraph()
+    # footer
+    for section in doc.sections:
+        footer = section.footer.paragraphs[0]
+        footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = footer.add_run("Portfolio CMS | Implementation document")
+        run.font.size = Pt(8)
+        run.font.color.rgb = RGBColor(120, 120, 120)
+
+def add_bullets(doc, items):
+    for item in items:
+        doc.add_paragraph(item, style="List Bullet")
+
+def add_numbers(doc, items):
+    for item in items:
+        doc.add_paragraph(item, style="List Number")
+
+def add_table(doc, headers, rows):
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Light Shading Accent 1"
+    for i, h in enumerate(headers):
+        table.rows[0].cells[i].text = h
+    for row in rows:
+        cells = table.add_row().cells
+        for i, val in enumerate(row):
+            cells[i].text = val
+    doc.add_paragraph()
+    return table
+
+# PRD document
+prd = Document()
+setup_doc(prd, "PERSONAL PORTFOLIO CMS", "Product Requirements Document (PRD) | Version 1.0 | October 2026")
+
+prd.add_heading("1. Executive Summary", level=1)
+prd.add_paragraph(
+    "Build a premium, minimalist black-and-white developer portfolio with a secure, private content-management dashboard. "
+    "The owner must be able to update projects, skills, certificates, experience, education, achievements, resume, and technical blog posts "
+    "without editing application code. Content follows a draft → private preview → explicit publish workflow."
+)
+prd.add_paragraph(
+    "The project is intended for a final-year BE Computer Science and Engineering student seeking software development opportunities. "
+    "Do not invent personal details, credentials, project outcomes, testimonials, or metrics. Populate personal content only from information "
+    "explicitly supplied by the owner."
+)
+
+prd.add_heading("2. Goals and Success Criteria", level=1)
+add_bullets(prd, [
+    "Present a polished, responsive portfolio that recruiters can understand quickly.",
+    "Provide one secure administrator account with no public registration.",
+    "Allow CRUD operations for all supported content types through the CMS.",
+    "Keep drafts and private preview content inaccessible to anonymous visitors.",
+    "Publish changes only after an explicit action; saving a draft must not modify the live version.",
+    "Support PDF and image uploads, resume replacement, and certificate verification links.",
+    "Include basic privacy-conscious analytics and manual content/media backup guidance.",
+    "Deploy initially to a Vercel-provided subdomain and keep the repository in GitHub."
+])
+
+prd.add_heading("3. Confirmed Product Decisions", level=1)
+add_table(prd, ["Area", "Decision"], [
+    ("Design", "Minimal white-and-black; generous whitespace, editorial typography, subtle gray dividers, restrained motion."),
+    ("Frontend", "React + Vite + TypeScript."),
+    ("Styling and motion", "Tailwind CSS + Motion for React."),
+    ("Backend", "Supabase PostgreSQL, Supabase Auth, Supabase Storage, Row Level Security."),
+    ("Admin", "Single authorized administrator; no public sign-up."),
+    ("Publishing", "Draft → private preview requiring admin login → explicit publish."),
+    ("Hosting", "Vercel subdomain initially."),
+    ("Contact", "Email, LinkedIn, and GitHub links only; no contact form."),
+    ("Analytics", "Privacy-friendly basic page-view analytics."),
+    ("Blog", "Technical blog / learning journal with drafts and published articles."),
+    ("Media", "PDF and image uploads."),
+    ("Backup", "Manual content export plus documented media backup and restoration process."),
+    ("Source control", "GitHub with main and develop branches; feature branches where useful.")
+])
+
+prd.add_heading("4. Users and Permissions", level=1)
+prd.add_heading("4.1 Public visitor", level=2)
+add_bullets(prd, [
+    "Can view published portfolio content and public assets.",
+    "Can navigate projects, skills, certificates, experience, education, achievements, blog articles, resume, and contact links.",
+    "Cannot access drafts, private previews, private uploads, admin records, or publishing operations."
+])
+prd.add_heading("4.2 Administrator", level=2)
+add_bullets(prd, [
+    "Can sign in using a pre-created and authorized account.",
+    "Can create, edit, duplicate, reorder, archive, publish, unpublish, and delete supported content, subject to confirmation and validation.",
+    "Can upload, replace, and remove permitted PDFs and images.",
+    "Can preview unpublished content while authenticated.",
+    "Can view basic analytics and export content/media manifests."
+])
+
+prd.add_heading("5. Public Website Requirements", level=1)
+public_sections = [
+    ("Home", "Large typographic introduction, short professional summary, featured work, selected skills, recent blog posts, and links to resume/contact."),
+    ("Projects", "Project cards, categories/technology tags, featured status, GitHub and live-demo links, screenshots, and detailed case-study pages."),
+    ("Skills", "Manageable categories for languages, frontend, backend, databases, developer tools, and other technologies. Do not use misleading skill progress bars."),
+    ("Certificates", "Title, issuer, issue date, optional expiry date, credential ID/link, and uploaded PDF or image."),
+    ("Experience", "Role, organization, dates, description, responsibilities, and technologies used."),
+    ("Education", "Degree, institution, dates, and optional coursework/details."),
+    ("Achievements", "Hackathons, awards, competitions, and other owner-verified accomplishments."),
+    ("Technical blog", "Article listing, tags, reading page, publication date, safe code blocks, and readable typography."),
+    ("Resume", "Downloadable PDF managed through the CMS."),
+    ("Contact", "Email, LinkedIn, and GitHub links."),
+    ("SEO", "Editable page title, description, social preview image, canonical URL, and favicon.")
+]
+add_table(prd, ["Section", "Requirements"], public_sections)
+
+prd.add_heading("6. Admin CMS Requirements", level=1)
+add_bullets(prd, [
+    "Dashboard overview: published content counts, drafts, recent edits, and basic traffic metrics.",
+    "Content manager: create, read, update, duplicate, reorder, archive, publish, unpublish, and delete supported content.",
+    "Reusable validated forms with required-field validation, URL/date checks, loading states, and clear errors.",
+    "Search, filters, pagination, empty states, and responsive tables.",
+    "Media library with upload progress, previews, replacement, removal, and reference checks before deletion.",
+    "Draft editor with unsaved-change warnings and clear status indicators.",
+    "Authenticated private preview; preview pages must not be publicly indexed or accessible anonymously.",
+    "Publish confirmation and feedback; saving a draft must not publish it.",
+    "Appearance/settings controls for hero copy, section visibility, section order, social links, and SEO metadata.",
+    "Backup/export tools and a written recovery procedure."
+])
+
+prd.add_heading("7. Publishing Model", level=1)
+add_numbers(prd, [
+    "Administrator edits a record in content_drafts.",
+    "Saving changes updates the draft only.",
+    "Preview renders the draft after server-side authorization and a valid admin session.",
+    "Publishing validates the draft and atomically updates the corresponding public record in published_content.",
+    "Unpublishing removes the public record while retaining the draft for later editing.",
+    "The system must handle concurrent edits using a version number or updated_at check and must not silently overwrite newer changes.",
+    "Public queries must read only published_content; they must never query drafts and merely hide them in the UI."
+])
+
+prd.add_heading("8. Technical Architecture", level=1)
+add_bullets(prd, [
+    "React + Vite + TypeScript for the public site and admin dashboard.",
+    "Tailwind CSS for styling; Motion for React for subtle transitions; Lucide React for icons.",
+    "React Router for public routes, admin routes, and not-found handling.",
+    "Supabase PostgreSQL for content; Supabase Auth for admin authentication; Supabase Storage for media.",
+    "Supabase Edge Function or equivalent trusted server-side operation for publishing and promoting assets.",
+    "Vercel for frontend hosting; GitHub for version control and change history.",
+    "A data-access layer must separate database queries from UI components."
+])
+prd.add_paragraph(
+    "The browser may use the Supabase publishable/anon key with RLS enabled. Service-role keys and other privileged credentials must never be included in client bundles, committed to Git, or exposed in public environment variables."
+)
+
+prd.add_heading("9. Database Schema", level=1)
+prd.add_paragraph("Use UUID identifiers, timestamps, constraints, indexes, and foreign keys where appropriate. Use version-controlled SQL migrations.")
+add_table(prd, ["Table", "Purpose and key fields"], [
+    ("admin_users", "Administrator allowlist: user_id (unique UUID matching auth.users), created_at."),
+    ("content_drafts", "Editable drafts: id, content_type, slug, draft_data JSONB, sort_order, version, created_at, updated_at."),
+    ("published_content", "Public version only: id, content_type, slug, content_data JSONB, sort_order, published_at, updated_at."),
+    ("media_assets", "File metadata: id, storage_path, bucket, file_name, MIME type, size_bytes, visibility, created_at."),
+    ("site_settings", "Draftable site-wide settings: id, draft_data JSONB, updated_at, version."),
+    ("page_views", "Minimal analytics: id, page_path, referrer_domain, created_at; do not store raw IP addresses.")
+])
+prd.add_paragraph("Initial content types: project, skill, certificate, experience, education, achievement, blog_post, site_section, site_settings, and resume.")
+prd.add_paragraph(
+    "Published slugs must be unique per content type. Add indexes for content_type, slug, sort_order, and published_at. "
+    "Validate content type and per-type required fields at the trusted publishing boundary."
+)
+
+prd.add_heading("10. Security and RLS Requirements", level=1)
+add_bullets(prd, [
+    "Enable RLS on every exposed table and define explicit SELECT/INSERT/UPDATE/DELETE policies.",
+    "Anonymous users can read published content only; they cannot read or modify drafts, admin records, or private analytics rows.",
+    "Only an authenticated user whose UUID exists in admin_users can manage drafts, settings, media metadata, and administrative functions.",
+    "Disable public sign-up. Create the initial admin through a controlled Supabase setup process and then authorize the UUID.",
+    "Use a safely defined is_admin() database function with a fixed search_path and appropriate privileges. Avoid recursive RLS policy design.",
+    "Publishing must be performed by a protected Edge Function or equivalent trusted operation that verifies the admin session and validates the draft.",
+    "Never rely solely on React route guards or hidden URLs for security.",
+    "Keep service-role credentials server-side only and outside Git.",
+    "Use rate limiting and validation for analytics ingestion.",
+    "Add security tests for anonymous access, unauthorized writes, draft leakage, publish requests, and storage permissions."
+])
+
+prd.add_heading("11. Storage Policies and Upload Safety", level=1)
+add_bullets(prd, [
+    "portfolio-private bucket: private draft assets; accessible only to authorized admin sessions under storage policies.",
+    "portfolio-public bucket: assets explicitly promoted for published content; visitors may read only this bucket.",
+    "The publish operation promotes only assets referenced by validated published content.",
+    "Allow only configured PDF and image MIME types and enforce file-size limits.",
+    "Generate safe storage names; validate file metadata and, where practical, file signatures.",
+    "Do not use obscure URLs as an access-control mechanism.",
+    "Before deletion, check whether an asset is referenced by draft or published content.",
+    "Do not claim that JSON export includes media bytes; the media files must also be downloaded for a complete backup."
+])
+
+prd.add_heading("12. Privacy-Friendly Analytics", level=1)
+add_bullets(prd, [
+    "Track basic page views and show totals, popular pages, and simple time trends in the admin dashboard.",
+    "Store page path, timestamp, and referring domain when available.",
+    "Do not store raw IP addresses, fingerprint visitors, collect precise location, or retain unnecessary identifiers.",
+    "Validate and rate-limit ingestion; apply bot filtering where practical.",
+    "Define and document a retention period.",
+    "Label metrics as approximate where blockers, bots, or filtering affect accuracy."
+])
+
+prd.add_heading("13. Backup and Recovery", level=1)
+add_bullets(prd, [
+    "Provide authenticated export of content as JSON and a media manifest with storage paths and metadata.",
+    "Document how to download all media files, including certificates, project images, blog images, and resume.",
+    "Document how to restore database content and re-upload files.",
+    "Keep SQL migrations and schema documentation in GitHub.",
+    "Maintain offline copies of both structured exports and media files.",
+    "Test a sample restore before relying on the backup process.",
+    "Supabase backup/PITR availability depends on plan and configuration; do not assume it is enabled."
+])
+
+prd.add_heading("14. Design and Accessibility", level=1)
+add_bullets(prd, [
+    "White canvas, near-black text, light-gray dividers, editorial typography, generous whitespace, and restrained motion.",
+    "No unnecessary gradients, neon colors, excessive rounded cards, or decorative animations that obscure content.",
+    "Responsive layouts for mobile, tablet, and desktop.",
+    "Semantic HTML, visible focus states, keyboard navigation, form labels, readable contrast, and reduced-motion support.",
+    "Loading, error, empty, offline, expired-session, and not-found states must be designed and tested."
+])
+
+prd.add_heading("15. Deployment and Git Workflow", level=1)
+add_bullets(prd, [
+    "Create a public GitHub repository named rakshith-portfolio unless the owner chooses otherwise.",
+    "Use main for stable releases and develop for ongoing integration; use feature branches for larger phases.",
+    "Deploy the frontend to a Vercel subdomain initially.",
+    "Configure production environment variables in Vercel and Supabase; do not commit .env files.",
+    "Apply database migrations in a controlled order and document admin bootstrap steps.",
+    "Run the production build, TypeScript checks, automated tests, accessibility checks, and security tests before release."
+])
+
+prd.add_heading("16. Acceptance Criteria", level=1)
+add_numbers(prd, [
+    "Unauthenticated visitors cannot access admin routes, draft records, private media, or publishing operations.",
+    "The authorized administrator can create, edit, reorder, archive/delete, and publish all supported content types.",
+    "Editing a draft does not change public content until explicit publishing.",
+    "Authenticated preview shows draft content; anonymous visitors cannot access it, including through direct API calls.",
+    "Public pages query only published content and never expose draft records.",
+    "PDF and image upload restrictions and storage access policies are tested.",
+    "New skills, certificates, projects, and blog posts can be added without code changes or frontend redeployment.",
+    "Analytics work without storing raw IP addresses or unnecessary visitor identifiers.",
+    "Content and media backup/restore steps are documented and a sample restore is tested.",
+    "Mobile, tablet, desktop, keyboard navigation, reduced-motion behavior, links, resume downloads, SEO, and browser console are checked.",
+    "No privileged keys are exposed in client code or committed to Git.",
+    "Deployment status and remaining limitations are reported honestly; no unrun tests are claimed as passed."
+])
+
+prd.add_heading("17. Out of Scope for Version 1", level=1)
+add_bullets(prd, [
+    "Multiple administrators or public registration.",
+    "Paid memberships, e-commerce, comments, or user-generated public content.",
+    "A custom backend server when Supabase can securely support the operation.",
+    "Complex behavioral tracking or visitor profiling.",
+    "Automatic AI-generated personal content.",
+    "A paid custom domain requirement."
+])
+
+prd.add_heading("18. Phased Implementation Plan", level=1)
+phases = [
+    ("Phase 1 — Repository and UI foundation", "React/Vite/TypeScript, design system, routes, shared components, responsive skeletons. Gate: local app and production build work."),
+    ("Phase 2 — Supabase and security", "Migrations, auth, admin allowlist, RLS, buckets, protected publish function, security tests. Gate: unauthorized access tests pass."),
+    ("Phase 3 — Admin CMS", "CRUD, media management, drafts, private preview, publishing, ordering. Gate: draft and published versions stay isolated."),
+    ("Phase 4 — Public portfolio and blog", "Connect public pages to published content only. Gate: no hardcoded personal content and no draft leakage."),
+    ("Phase 5 — Analytics and recovery", "Validated analytics, dashboard metrics, JSON export, media manifest, restore documentation. Gate: export and sample restore tested."),
+    ("Phase 6 — Hardening and deployment", "Security, accessibility, responsiveness, build, Vercel config, deployment and rollback guide. Gate: acceptance tests pass.")
+]
+add_table(prd, ["Phase", "Deliverables and exit gate"], phases)
+
+prd.add_heading("19. Antigravity Operating Instructions", level=1)
+add_bullets(prd, [
+    "Inspect the repository before modifying it and preserve working code.",
+    "Work phase by phase; do not silently skip phases or weaken security to make the UI work.",
+    "After each phase, run available checks, fix failures, list changed files, explain setup steps, and report actual test results.",
+    "Do not invent profile details, certificates, metrics, project outcomes, testimonials, or employment history.",
+    "Wait for owner approval before moving to the next phase.",
+    "Use migrations for database changes and keep configuration and documentation in version control.",
+    "Prefer simple, maintainable implementations over unnecessary dependencies."
+])
+
+prd_path = out / "Portfolio_CMS_PRD.docx"
+prd.save(prd_path)
+
+# Master prompt document
+prompt_doc = Document()
+setup_doc(prompt_doc, "MASTER ANTIGRAVITY PROMPT", "Portfolio Website + Secure CMS | Copy-ready build specification")
+
+prompt_doc.add_heading("How to use this prompt", level=1)
+prompt_doc.add_paragraph(
+    "Open your portfolio repository in Antigravity and paste the master prompt below. It instructs the agent to build the complete system in six controlled phases, "
+    "validate each phase, and stop for approval at phase gates. Do not paste database secrets into prompts or source files. Create the Supabase project and configure secrets through the appropriate secure environment settings."
+)
+
+prompt_doc.add_heading("MASTER PROMPT — COPY EVERYTHING BELOW", level=1)
+
+master_prompt = r"""You are the lead product engineer responsible for building my final-year BE Computer Science and Engineering personal portfolio website and its private content-management system (CMS). Build a production-minded, secure, maintainable application. Inspect the repository before changing anything and preserve working code.
+
+PRODUCT VISION
+Create a premium minimalist black-and-white developer portfolio that recruiters can browse, plus a secure admin dashboard that lets the owner manage all portfolio content without editing code. The owner must be able to add future skills/technologies, certificates, projects, experience, education, achievements, resume versions, and technical blog posts from the dashboard.
+
+Do not invent personal profile details, certificates, project outcomes, metrics, testimonials, or employment history. Use clearly labeled placeholders only where needed and keep them out of the public site until the owner supplies real information.
+
+CONFIRMED DECISIONS
+- Visual style: white background, near-black text, light-gray dividers, editorial typography, generous whitespace, subtle motion. No unnecessary gradients, neon colors, or generic dashboard styling.
+- Frontend: React + Vite + TypeScript.
+- Styling: Tailwind CSS.
+- Motion: Motion for React; respect prefers-reduced-motion.
+- Icons: Lucide React.
+- Routing: React Router.
+- Backend: Supabase PostgreSQL, Supabase Auth, Supabase Storage, Row Level Security (RLS), and a protected Supabase Edge Function or equivalent trusted server-side publishing operation.
+- Hosting: Vercel subdomain initially.
+- Source control: GitHub.
+- One authorized administrator; no public registration.
+- Publishing workflow: save draft → authenticated private preview → explicit publish.
+- Contact section: email, LinkedIn, GitHub links only; no contact form.
+- Privacy-conscious basic analytics.
+- Technical blog/learning journal included.
+- Upload formats: PDFs and images.
+- Backup: manual content export plus documented media download and recovery process.
+- All portfolio content must be editable from the CMS and data-driven, not hardcoded in UI components.
+
+PUBLIC WEBSITE REQUIREMENTS
+Create these pages/sections:
+1. Home: typographic hero, editable intro copy, featured projects, selected skills, recent blog posts, resume link, contact links.
+2. Projects: cards, technology tags, categories, featured status, screenshots, GitHub/live-demo links, and detailed case-study pages.
+3. Skills: configurable categories such as languages, frontend, backend, databases, and developer tools. Do not use misleading proficiency bars.
+4. Certificates: title, issuer, issue date, optional expiry, credential ID/link, and PDF/image attachment.
+5. Experience: role, organization, dates, responsibilities, technologies.
+6. Education: degree, institution, dates, optional coursework.
+7. Achievements: owner-verified hackathons, awards, and accomplishments.
+8. Blog: listing, tags, article pages, publication date, readable code blocks, and safe content rendering.
+9. Resume: downloadable PDF managed through the CMS.
+10. Contact: email, LinkedIn, GitHub.
+11. SEO settings: title, description, social preview image, canonical URL, favicon.
+
+ADMIN CMS REQUIREMENTS
+- Secure login, no public signup, protected routes, session-expiry handling.
+- Dashboard summary with published counts, drafts, recent edits, and basic analytics.
+- CRUD for projects, skills, certificates, experience, education, achievements, blog posts, settings, and resume.
+- Search, filtering, pagination, ordering, empty/loading/error states, form validation, and unsaved-change warnings.
+- Media library with PDF/image upload progress, preview, replacement, removal, and safe deletion checks.
+- Draft management, authenticated preview, explicit publish/unpublish, confirmation dialogs, and discard-draft flow.
+- Save must never publish automatically.
+- Settings to edit hero copy, section visibility/order, social links, and SEO.
+- Export content and provide backup/recovery documentation.
+
+ARCHITECTURE
+Use a clean, modular React architecture. Keep data access separate from UI components. Use reusable components, forms, types, hooks, and route guards. Use Supabase client access from the browser only with the publishable/anon key and RLS. Any privileged action must be enforced server-side.
+
+PUBLISHING MODEL — SECURITY CRITICAL
+Use separate content_drafts and published_content tables, or an equally strong versioned model that does not expose draft fields through public access.
+- content_drafts stores editable unpublished content.
+- published_content stores only the current public version.
+- Public pages query published_content only.
+- Private preview requires a valid authenticated admin session and server-side authorization.
+- A trusted publishing operation verifies admin identity, validates fields and media references, then atomically publishes the draft.
+- Unpublishing removes the public version but retains the draft.
+- Use version/updated_at checks to avoid silently overwriting newer edits.
+- Drafts must not be hidden only with frontend conditional rendering. Anonymous API queries must be unable to read them.
+
+DATABASE
+Create version-controlled SQL migrations for:
+1. admin_users: allowlisted auth user UUID, unique user_id, created_at.
+2. content_drafts: id, content_type, slug, draft_data JSONB, sort_order, version, created_at, updated_at.
+3. published_content: id, content_type, slug, content_data JSONB, sort_order, published_at, updated_at.
+4. media_assets: id, bucket, storage_path, file_name, MIME type, size_bytes, visibility, created_at.
+5. site_settings: id, draft_data JSONB, version, updated_at.
+6. page_views: id, page_path, referrer_domain, created_at; do not store raw IP addresses.
+
+Use UUIDs, indexes, constraints, foreign keys where applicable, and unique published slugs per content type. Initial content types: project, skill, certificate, experience, education, achievement, blog_post, site_section, site_settings, resume. Validate content-type-specific required fields at the trusted publish boundary.
+
+AUTH AND RLS
+- Enable RLS on every exposed table.
+- Anonymous users can read published content only.
+- Drafts, admin records, private media, and administrative actions are inaccessible to anonymous users.
+- Only the authenticated UUID allowlisted in admin_users can manage CMS content.
+- Disable public registration and document controlled creation of the first admin.
+- If using an is_admin() database function, define it safely with a fixed search_path and appropriate privileges; avoid recursive RLS policies.
+- Publishing and asset promotion must be authorized in a trusted Edge Function or equivalent server-side operation.
+- Never expose Supabase service-role keys in browser code, Vite public environment variables, source control, or client bundles.
+- Do not rely only on frontend route guards for security.
+- Include tests for anonymous reads/writes, admin authorization, draft leakage, publishing authorization, and storage permissions.
+
+STORAGE
+Create two buckets:
+- portfolio-private: draft assets accessible only to authorized admin sessions under storage policies.
+- portfolio-public: explicitly promoted assets referenced by published content; visitors can read public assets.
+The trusted publishing flow promotes only approved, referenced assets. Validate allowed PDF/image types and file size, use safe generated filenames, validate metadata and file signatures where practical, and check references before deletion. Do not rely on obscure URLs for security.
+
+ANALYTICS AND PRIVACY
+Provide basic page-view totals, popular pages, and simple trends in the admin dashboard. Validate and rate-limit ingestion and apply bot filtering where practical. Do not store raw IP addresses, fingerprint visitors, collect precise location, or retain unnecessary identifiers. Document a retention period and label metrics approximate when appropriate. Raw analytics rows must not be publicly readable.
+
+BACKUP
+Provide authenticated JSON content export and a media manifest. Document how to download all media separately, restore database content, re-upload files, and verify restoration. Keep migrations in GitHub. A JSON export alone is not a complete media backup. Do not assume Supabase database backup/PITR features are available on the chosen plan.
+
+DESIGN AND ACCESSIBILITY
+- Minimal monochrome visual language, premium editorial typography, generous whitespace, fine gray dividers, subtle hover/reveal transitions.
+- Responsive mobile/tablet/desktop.
+- Semantic HTML, keyboard navigation, visible focus, labels, sufficient contrast, reduced-motion support.
+- Provide useful loading, empty, error, offline, expired-session, and not-found states.
+- Keep animations restrained and never make motion essential to understanding or navigating.
+
+ENVIRONMENT AND DEPLOYMENT
+- Use a .env.example with variable names and safe placeholders only.
+- Never commit .env or secrets.
+- Configure production environment variables through Vercel/Supabase settings.
+- Deploy frontend to a Vercel subdomain initially.
+- Include migration instructions, admin bootstrap steps, deployment guide, backup/restore guide, and rollback notes.
+- Use GitHub main for stable releases and develop for ongoing work; feature branches are appropriate for major phases.
+
+ACCEPTANCE TESTS
+Do not mark the application complete until these are verified:
+1. Anonymous users cannot access admin routes, drafts, private files, or publish actions.
+2. The allowlisted admin can manage all supported content types.
+3. Saving a draft does not alter public content.
+4. Authenticated preview shows draft content; anonymous direct API requests cannot access it.
+5. Publishing changes the public version; unpublishing removes it from public views but retains the draft.
+6. File type/size restrictions and storage policies work.
+7. New skills/certificates/projects/blog posts can be added without changing code or redeploying the frontend.
+8. Analytics do not store raw IP addresses or unnecessary identifiers.
+9. Content export and media backup/restore instructions work; test a sample restore.
+10. Mobile, tablet, desktop, keyboard access, reduced motion, links, resume download, SEO, and console errors are checked.
+11. No privileged credentials are exposed in the client bundle or Git.
+12. Report only tests actually run and deployment status actually achieved.
+
+IMPLEMENTATION METHOD — SIX PHASES
+Work through these phases in order. Complete one phase, run checks, fix issues, summarize changed files, setup instructions, actual test results, and remaining risks, then STOP and wait for my approval before beginning the next phase. Do not skip a phase or pretend a check passed.
+
+PHASE 1 — Repository and UI foundation
+Inspect repository; establish React/Vite/TypeScript, Tailwind, routing, design tokens, shared components, responsive public/admin route skeletons, and .env.example. Use placeholder-only content and keep it unpublished. Run the app and production build. Stop for approval.
+
+PHASE 2 — Supabase and security
+Create SQL migrations, admin allowlist, safe authorization helper, RLS, private/public storage policies, trusted publish function, and security tests. Explain how I create the Supabase project and first admin without sharing secrets in chat. Run available tests. Stop for approval.
+
+PHASE 3 — Admin CMS
+Implement authenticated dashboard, CRUD, upload manager, drafts, authenticated preview, publish/unpublish, ordering, and settings. Test draft/public isolation and permissions. Stop for approval.
+
+PHASE 4 — Public website and blog
+Connect all public pages to published content only. Implement project case studies, skills, certificates, experience, education, achievements, resume, blog, contact links, and SEO. Test that drafts never leak. Stop for approval.
+
+PHASE 5 — Analytics and backup
+Implement validated privacy-conscious analytics, dashboard metrics, content JSON export, media manifest, and recovery documentation. Test export and sample restore. Stop for approval.
+
+PHASE 6 — Hardening and deployment
+Run TypeScript/lint/build/tests; test security, responsive behavior, accessibility, links, storage, publishing, and environment configuration. Prepare Vercel deployment, migration, admin bootstrap, backup, and rollback instructions. Deploy only when configured and authorized. Report real status and any remaining limitations.
+
+WORKING RULES
+- Inspect existing files before modifying them.
+- Prefer simple, maintainable code and avoid unnecessary dependencies.
+- Do not fabricate personal content.
+- Never weaken RLS or expose secrets to make the app work.
+- Do not replace working functionality without explaining why.
+- Use SQL migrations for schema changes.
+- Keep UI, types, data access, and validation modular.
+- If a critical detail is missing, ask a concise question instead of guessing.
+- Do not start the next phase until I approve the current phase.
+
+Begin with PHASE 1 ONLY. First inspect the repository, then implement the foundation, run the available checks, report exactly what changed, and wait for my approval."""
+
+for para in master_prompt.split("\n"):
+    if para.strip() == "":
+        prompt_doc.add_paragraph()
+    elif para.isupper() and len(para) < 90:
+        prompt_doc.add_heading(para.title(), level=2)
+    elif para.startswith("- "):
+        prompt_doc.add_paragraph(para[2:], style="List Bullet")
+    elif para[:2].isdigit() and para[1:3] == ". ":
+        prompt_doc.add_paragraph(para[4:], style="List Number")
+    else:
+        prompt_doc.add_paragraph(para)
+
+prompt_path = out / "Portfolio_CMS_Master_Antigravity_Prompt.docx"
+prompt_doc.save(prompt_path)
+
+print("Created files:")
+print(f"- {prd_path} ({prd_path.stat().st_size} bytes)")
+print(f"- {prompt_path} ({prompt_path.stat().st_size} bytes)")
